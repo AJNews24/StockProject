@@ -1,0 +1,28 @@
+import quandl
+
+import pandas as pd
+
+import numpy as np
+
+import fbprophet
+
+import pytrends
+
+from pytrends.request import TrendReq
+
+import matplotlib.pyplot as plt
+
+import matplotlib
+
+class Stocker():
+    def __init__(self, ticker, exchange-'WIKI'):
+        ticker = ticker.upper()
+        self.symbol = ticker
+
+try:
+    stock = quandl.get('%s/%s' % (exchange, ticker))
+
+except Exception as e:
+    print('Error Retrieving Data.')
+    print(e)
+    return
