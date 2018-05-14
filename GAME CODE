@@ -1,25 +1,10 @@
 # FROM MAIN.PY
+import pygame as pg
+import random
 from settings import *
 from sprites import *
-#AN
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-# BV = Bryan V 
-# AN =Andrew Nieuwsma 
+from os import path
 
-#AN 
-# GAME LOOP
-running = True
-while running:
-    #  keep loop running at the right speed
-    clock.tick(FPS)
-#GAME RENDERING
-screen.fill(BLUE)
-    screen.blit(background, background_rect)
-    all_sprites.draw(screen)
-    draw_text(screen, str(totalPoints), 34, WIDTH/2, 10)
-    draw_shield_bar(screen, 10, 10, player.start_shield, player.shield)
-    draw_lives(screen, WIDTH - 100, 5, player.lives)
-#bv
 class Game:
     def __init__(self):
         # initialize game window, etc
@@ -29,12 +14,29 @@ class Game:
         pg.display.set_caption(TITLE)
         self.clock = pg.time.Clock()
         self.running = True
+        self.font_name = pg.font.match_font(FONT_NAME)
+        self.load_data()
+
+    def load_data(self):
+        # load high score
+        self.dir = path.dirname(__file__)
+        with open(path.join(self.dir, HS_FILE), 'r') as f:
+            try:
+                self.highscore = int(f.read())
+            except:
+                self.highscore = 0
 
     def new(self):
         # start a new game
+        self.score = 0
         self.all_sprites = pg.sprite.Group()
-        self.player = Player()
+        self.platforms = pg.sprite.Group()
+        self.player = Player(self)
         self.all_sprites.add(self.player)
+        for plat in PLATFORM_LIST:
+            p = Platform(*plat)
+            self.all_sprites.add(p)
+            self.platforms.add(p)
         self.run()
 
     def run(self):
@@ -49,6 +51,39 @@ class Game:
     def update(self):
         # Game Loop - Update
         self.all_sprites.update()
+        # check if player hits a platform - only if falling
+        if self.player.vel.y > 0:
+            hits = pg.sprite.spritecollide(self.player, self.platforms, False)
+            if hits:
+                self.player.pos.y = hits[0].rect.top
+                self.player.vel.y = 0
+
+        # if player reaches top 1/4 of screen
+        if self.player.rect.top <= HEIGHT / 4:
+            self.player.pos.y += abs(self.player.vel.y)
+            for plat in self.platforms:
+                plat.rect.y += abs(self.player.vel.y)
+                if plat.rect.top >= HEIGHT:
+                    plat.kill()
+                    self.score += 10
+
+        # Die!
+        if self.player.rect.bottom > HEIGHT:
+            for sprite in self.all_sprites:
+                sprite.rect.y -= max(self.player.vel.y, 10)
+                if sprite.rect.bottom < 0:
+                    sprite.kill()
+        if len(self.platforms) == 0:
+            self.playing = False
+
+        # spawn new platforms to keep same average number
+        while len(self.platforms) < 6:
+            width = random.randrange(50, 100)
+            p = Platform(random.randrange(0, WIDTH - width),
+                         random.randrange(-75, -30),
+                         width, 20)
+            self.platforms.add(p)
+            self.all_sprites.add(p)
 
     def events(self):
         # Game Loop - events
@@ -58,23 +93,63 @@ class Game:
                 if self.playing:
                     self.playing = False
                 self.running = False
+            if event.type == pg.KEYDOWN:
+                if event.key == pg.K_SPACE:
+                    self.player.jump()
 
     def draw(self):
         # Game Loop - draw
-        self.screen.fill(BLACK)
+        self.screen.fill(BGCOLOR)
         self.all_sprites.draw(self.screen)
+        self.draw_text(str(self.score), 22, WHITE, WIDTH / 2, 15)
         # *after* drawing everything, flip the display
         pg.display.flip()
 
     def show_start_screen(self):
         # game splash/start screen
-        pass
+        self.screen.fill(BGCOLOR)
+        self.draw_text(TITLE, 48, WHITE, WIDTH / 2, HEIGHT / 4)
+        self.draw_text("Arrows to move, Space to jump", 22, WHITE, WIDTH / 2, HEIGHT / 2)
+        self.draw_text("Press a key to play", 22, WHITE, WIDTH / 2, HEIGHT * 3 / 4)
+        self.draw_text("High Score: " + str(self.highscore), 22, WHITE, WIDTH / 2, 15)
+        pg.display.flip()
+        self.wait_for_key()
 
     def show_go_screen(self):
         # game over/continue
-        pass
+        if not self.running:
+            return
+        self.screen.fill(BGCOLOR)
+        self.draw_text("GAME OVER", 48, WHITE, WIDTH / 2, HEIGHT / 4)
+        self.draw_text("Score: " + str(self.score), 22, WHITE, WIDTH / 2, HEIGHT / 2)
+        self.draw_text("Press a key to play again", 22, WHITE, WIDTH / 2, HEIGHT * 3 / 4)
+        if self.score > self.highscore:
+            self.highscore = self.score
+            self.draw_text("NEW HIGH SCORE!", 22, WHITE, WIDTH / 2, HEIGHT / 2 + 40)
+            with open(path.join(self.dir, HS_FILE), 'w') as f:
+                f.write(str(self.score))
+        else:
+            self.draw_text("High Score: " + str(self.highscore), 22, WHITE, WIDTH / 2, HEIGHT / 2 + 40)
+        pg.display.flip()
+        self.wait_for_key()
 
-screen.fill = 
+    def wait_for_key(self):
+        waiting = True
+        while waiting:
+            self.clock.tick(FPS)
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
+                    waiting = False
+                    self.running = False
+                if event.type == pg.KEYUP:
+                    waiting = False
+
+    def draw_text(self, text, size, color, x, y):
+        font = pg.font.Font(self.font_name, size)
+        text_surface = font.render(text, True, color)
+        text_rect = text_surface.get_rect()
+        text_rect.midtop = (x, y)
+        self.screen.blit(text_surface, text_rect)
 
 g = Game()
 g.show_start_screen()
@@ -84,42 +159,90 @@ while g.running:
 
 pg.quit()
 
-
-###########FROM SEPERATE FOLDER sprites.py
-#AN 
-import pygame as pg 
-from settings import * 
-class Player(pg.sprite.Sprite):
-    def __int__(self):
-        pg.sprite.Sprite.__int__(self)
-        self.image = pygame.Surface((30,40))
-        self.image.fill(GREEN)
-        self.rect = self.image.get_rect()
-        self.vx = 0 
-        self.vy = 0 
-
-    def update(self):
-        self.vx = 0 
-        keys = pg.keys.get_pressed()
-        if keys[pg.K_LEFT]:
-            self.vx = -5
-        if keys[pg.K_RIGHT]:
-            self.vx = 5
-        
-        self.rect.x += self.vx
-        self.rect.y += self.vy
-        
-   #####################################FROM SEPERATE FOLDER settings.py
-   # BV
-TITLE = "	Jump Commando!"
+#FROM SETTINGS.PY
+# game options/settings
+TITLE = "Cube Jump"
 WIDTH = 480
 HEIGHT = 600
 FPS = 60
-	
-	# define colors
+FONT_NAME = 'arial'
+HS_FILE = "highscore.txt"
+
+# Player properties
+PLAYER_ACC = 0.5
+PLAYER_FRICTION = -0.12
+PLAYER_GRAV = 0.8
+PLAYER_JUMP = 20
+
+# Starting platforms
+PLATFORM_LIST = [(0, HEIGHT - 40, WIDTH, 40),
+                 (WIDTH / 2 - 50, HEIGHT * 3 / 4, 100, 20),
+                 (125, HEIGHT - 350, 100, 20),
+                 (350, 200, 100, 20),
+                 (175, 100, 50, 20)]
+
+# define colors
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 YELLOW = (255, 255, 0)
+LIGHTBLUE = (0, 155, 155)
+BGCOLOR = LIGHTBLUE
+
+#FROM SPRITES.PY
+# Sprite classes for platform game
+import pygame as pg
+from settings import *
+vec = pg.math.Vector2
+
+class Player(pg.sprite.Sprite):
+    def __init__(self, game):
+        pg.sprite.Sprite.__init__(self)
+        self.game = game
+        self.image = pg.Surface((30, 40))
+        self.image.fill(YELLOW)
+        self.rect = self.image.get_rect()
+        self.rect.center = (WIDTH / 2, HEIGHT / 2)
+        self.pos = vec(WIDTH / 2, HEIGHT / 2)
+        self.vel = vec(0, 0)
+        self.acc = vec(0, 0)
+
+    def jump(self):
+        # jump only if standing on a platform
+        self.rect.y += 1
+        hits = pg.sprite.spritecollide(self, self.game.platforms, False)
+        self.rect.y -= 1
+        if hits:
+            self.vel.y = -PLAYER_JUMP
+
+    def update(self):
+        self.acc = vec(0, PLAYER_GRAV)
+        keys = pg.key.get_pressed()
+        if keys[pg.K_LEFT]:
+            self.acc.x = -PLAYER_ACC
+        if keys[pg.K_RIGHT]:
+            self.acc.x = PLAYER_ACC
+
+        # apply friction
+        self.acc.x += self.vel.x * PLAYER_FRICTION
+        # equations of motion
+        self.vel += self.acc
+        self.pos += self.vel + 0.5 * self.acc
+        # wrap around the sides of the screen
+        if self.pos.x > WIDTH:
+            self.pos.x = 0
+        if self.pos.x < 0:
+            self.pos.x = WIDTH
+
+        self.rect.midbottom = self.pos
+
+class Platform(pg.sprite.Sprite):
+    def __init__(self, x, y, w, h):
+        pg.sprite.Sprite.__init__(self)
+        self.image = pg.Surface((w, h))
+        self.image.fill(GREEN)
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
