@@ -1,4 +1,9 @@
 # FROM MAIN.PY
+#AS STATED IN THE README:
+##All information in order to make a similar game can be found in the videos in the playlist below
+##All information in this code is largely based off of these videos
+##https://www.youtube.com/watch?v=-9bjlpaVQAA&index=19&list=PLsk-HSGFjnaG-BwZkuAOcVwWldfCLu1pq
+
 import pygame as pg
 import random
 from settings import *
